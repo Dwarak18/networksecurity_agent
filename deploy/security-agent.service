@@ -1,0 +1,56 @@
+[Unit]
+Description=Network Security Agent
+Documentation=https://github.com/your-org/network-security-agent
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=security-agent
+Group=security-agent
+WorkingDirectory=/opt/security-agent
+Environment=PYTHONPATH=/opt/security-agent/src
+Environment=PYTHONUNBUFFERED=1
+
+# Security settings
+NoNewPrivileges=false
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log/security-agent /opt/security-agent/data
+PrivateTmp=true
+
+# Capabilities required for packet capture and firewall
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW CAP_SYS_ADMIN
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_SYS_ADMIN
+
+# Main command
+ExecStart=/opt/security-agent/venv/bin/python /opt/security-agent/src/security_agent.py \
+    --config /opt/security-agent/config/security_agent.yaml \
+    --daemon
+
+# Reload configuration
+ExecReload=/bin/kill -HUP $MAINPID
+KillMode=mixed
+KillSignal=SIGTERM
+
+# Restart policy
+Restart=always
+RestartSec=10
+StartLimitInterval=300
+StartLimitBurst=5
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=security-agent
+
+# Process limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+# Memory and CPU limits
+MemoryMax=1G
+CPUQuota=100%
+
+[Install]
+WantedBy=multi-user.target

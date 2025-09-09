@@ -1,0 +1,106 @@
+version: '3.8'
+
+services:
+  security-agent:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: network-security-agent
+    restart: unless-stopped
+    
+    # Network configuration
+    network_mode: host  # Required for packet capture
+    
+    # Capabilities for packet capture and firewall management
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_ADMIN
+    
+    # Privileged mode (required for firewall operations)
+    privileged: true
+    
+    # Environment variables
+    environment:
+      - LOG_LEVEL=INFO
+      - PYTHONUNBUFFERED=1
+    
+    # Volume mounts
+    volumes:
+      - ./config:/app/config:ro
+      - security-agent-logs:/var/log/security-agent
+      - security-agent-data:/app/data
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+    
+    # Port mappings (if not using host networking)
+    # ports:
+    #   - "8080:8080"  # API
+    #   - "9090:9090"  # Metrics
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+    
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+  # Optional: Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: security-agent-prometheus
+    restart: unless-stopped
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    depends_on:
+      - security-agent
+
+  # Optional: Grafana for visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: security-agent-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    depends_on:
+      - prometheus
+
+volumes:
+  security-agent-logs:
+  security-agent-data:
+  prometheus-data:
+  grafana-data:

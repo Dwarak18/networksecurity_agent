@@ -1,0 +1,193 @@
+# Network Security Agent Configuration
+# This file defines detection thresholds, policies, and operational parameters
+
+# Network Interface Configuration
+network:
+  interface: "eth0"  # Network interface to monitor (auto-detect if empty)
+  promiscuous: true  # Enable promiscuous mode for full traffic capture
+  snaplen: 65535     # Maximum packet capture length
+  timeout_ms: 100    # Packet capture timeout in milliseconds
+
+# Traffic Analysis Windows
+time_windows:
+  short_window: 10    # Short-term analysis window (seconds)
+  medium_window: 60   # Medium-term analysis window (seconds)
+  long_window: 300    # Long-term baseline window (seconds)
+  cleanup_interval: 30 # State cleanup interval (seconds)
+
+# Detection Thresholds
+detection:
+  # SYN Flood Detection
+  syn_flood:
+    enabled: true
+    syn_rate_threshold: 200      # SYN packets per second
+    syn_ack_ratio_threshold: 0.2 # Minimum SYN/ACK ratio
+    window_size: 10              # Analysis window (seconds)
+    
+  # UDP Flood Detection  
+  udp_flood:
+    enabled: true
+    udp_pps_threshold: 5000      # UDP packets per second
+    window_size: 10              # Analysis window (seconds)
+    
+  # ICMP Flood Detection
+  icmp_flood:
+    enabled: true
+    icmp_pps_threshold: 200      # ICMP packets per second
+    window_size: 10              # Analysis window (seconds)
+    
+  # Port Scan Detection
+  port_scan:
+    enabled: true
+    unique_ports_threshold: 100  # Unique destination ports
+    window_size: 60              # Analysis window (seconds)
+    connection_threshold: 5      # Max connections per port
+    
+  # HTTP Request Flood Detection
+  http_flood:
+    enabled: true
+    http_req_threshold: 300      # HTTP requests per second
+    window_size: 10              # Analysis window (seconds)
+    
+  # DNS Amplification Detection
+  dns_amplification:
+    enabled: true
+    dns_response_size_threshold: 512  # Minimum suspicious response size
+    dns_qps_threshold: 100           # DNS queries per second
+    amplification_ratio: 10          # Response/Query size ratio
+    
+  # Anomaly Detection (Statistical)
+  anomaly:
+    enabled: true
+    zscore_threshold: 4.0        # Z-score threshold for anomaly
+    ewma_alpha: 0.1              # EWMA smoothing factor
+    min_samples: 100             # Minimum samples for baseline
+    
+# Scoring and Decision Making
+scoring:
+  # Threat scoring weights
+  weights:
+    syn_flood: 30
+    udp_flood: 25
+    icmp_flood: 20
+    port_scan: 35
+    http_flood: 25
+    dns_amplification: 40
+    anomaly: 15
+    threat_intel: 50
+    
+  # Decision thresholds
+  thresholds:
+    warn_threshold: 50           # Warning threshold
+    ban_threshold: 80            # Automatic ban threshold
+    critical_threshold: 100      # Critical threat threshold
+    
+# Blocking Actions
+blocking:
+  # Block duration (Time To Live)
+  ttl:
+    default: 1200               # Default block duration (20 minutes)
+    port_scan: 3600            # Port scan block duration (1 hour)
+    dos_attack: 7200           # DoS attack block duration (2 hours)
+    critical: 21600            # Critical threat block duration (6 hours)
+    
+  # Rate limiting
+  rate_limit:
+    enabled: true
+    packets_per_second: 100     # Rate limit to X pps
+    burst_size: 200            # Burst allowance
+    
+  # Firewall backend
+  firewall:
+    backend: "nftables"         # nftables, iptables, or mock
+    chain: "security_agent"     # Custom chain name
+    table: "filter"            # nftables table
+    
+# Allow/Deny Lists
+access_control:
+  # Always allow these IPs (CIDR notation supported)
+  allowlist:
+    - "127.0.0.1/32"
+    - "::1/128"
+    - "10.0.0.0/8"
+    - "192.168.0.0/16"
+    - "172.16.0.0/12"
+    
+  # Always block these IPs
+  denylist:
+    - "0.0.0.0/32"
+    
+  # Threat intelligence feeds (optional)
+  threat_intel:
+    enabled: false
+    feeds:
+      - url: "https://example.com/malicious-ips.txt"
+        format: "text"
+        update_interval: 3600
+        
+# Memory and Performance
+performance:
+  max_tracked_ips: 100000      # Maximum IPs to track in memory
+  state_cleanup_interval: 300   # State cleanup interval (seconds)
+  metric_export_interval: 60    # Metrics export interval (seconds)
+  log_level: "INFO"            # DEBUG, INFO, WARN, ERROR
+  
+# Logging Configuration
+logging:
+  # Log format and destination
+  format: "json"               # json or text
+  file: "/var/log/security-agent/agent.log"
+  max_size_mb: 100
+  max_files: 10
+  
+  # Event logging
+  events:
+    log_detections: true
+    log_blocks: true
+    log_unblocks: true
+    log_statistics: true
+    
+# Metrics and Observability
+metrics:
+  enabled: true
+  port: 9090                   # Prometheus metrics port
+  path: "/metrics"
+  
+  # OpenTelemetry (optional)
+  opentelemetry:
+    enabled: false
+    endpoint: "http://localhost:4317"
+    
+# REST API Configuration
+api:
+  enabled: true
+  host: "127.0.0.1"
+  port: 8080
+  
+  # API endpoints
+  endpoints:
+    status: "/status"
+    metrics: "/api/v1/metrics"
+    blocklist: "/api/v1/blocklist"
+    allowlist: "/api/v1/allowlist"
+    config: "/api/v1/config"
+    
+# Service Configuration
+service:
+  name: "network-security-agent"
+  user: "security-agent"
+  group: "security-agent"
+  pid_file: "/var/run/security-agent.pid"
+  
+# Development and Testing
+development:
+  mock_mode: false             # Enable for testing without root privileges
+  pcap_file: ""               # Read from pcap file instead of live capture
+  replay_speed: 1.0           # Replay speed multiplier
+  
+# Feature Flags
+features:
+  deep_packet_inspection: true  # Enable DPI for application layer analysis
+  geo_ip_lookup: false         # Enable GeoIP lookups (requires database)
+  reputation_scoring: false    # Enable IP reputation scoring
+  machine_learning: false      # Enable ML-based detection (experimental)
